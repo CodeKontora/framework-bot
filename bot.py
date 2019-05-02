@@ -11,7 +11,7 @@ ip_port = proxy_changer.read_proxy()
 tb.apihelper.proxy = {'https': 'https://{}'.format(ip_port)}
 
 # Соединяемся с ботом и убираем многопоточность
-bot = tb.TeleBot('720900961:AAHH-XKpDWthRv-w9NSiAPwPkmDqZfqEl9g', threaded=False)
+bot = tb.TeleBot('Сюда вставить токен', threaded=False)
 
 
 @bot.message_handler(commands=['start'])
