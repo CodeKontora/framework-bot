@@ -1,4 +1,6 @@
+import json
 import loger
+import apiai
 import telebot as tb
 import proxy_changer
 from time import sleep
@@ -11,46 +13,33 @@ ip_port = proxy_changer.read_proxy()
 tb.apihelper.proxy = {'https': 'https://{}'.format(ip_port)}
 
 # Соединяемся с ботом и убираем многопоточность
-bot = tb.TeleBot('Сюда вставить токен', threaded=False)
-
-
-@bot.message_handler(commands=['start'])
-def start_message(message):
-    bot.send_message(message.chat.id, '''
-    Я пока что умею только здороваться. Напишите что-нибудь''')
-
-
-@bot.message_handler(commands=['proxy'])
-def proxy_message(message):
-    bot.send_message(message.chat.id, '''
-    Сейчас я на ip {}'''.format(ip_port))
-
-
-@bot.message_handler(commands=['log'])
-def send_log(message):
-    log = open('history_work.log', 'r')
-    bot.send_document(message.chat.id, log)
-
-    # Проверяем есть ли файл
-    try:
-        file = open('last_cleaning_log.txt', 'r')
-
-    # Если нету, считаем, что чистки ещё не было
-    except FileNotFoundError:
-        bot.send_message(message.chat.id, 'Чистки ещё не было')
-
-    # Если есть, читаем из файла дату последней чистки лога и отправляем её
-    else:
-        date_last_cleaning_log = file.read()
-        file.close()
-
-        bot.send_message(message.chat.id, '''
-        Последняя чистка была {}'''.format(date_last_cleaning_log))
+bot = tb.TeleBot('866043065:AAFiQShKR9takR3DE2FHoFjEM4bwRvnf5KE', threaded=False)
 
 
 @bot.message_handler(content_types=['text'])
-def repeat_all_messages(message):
-    bot.reply_to(message, 'Привет, чтобы там не было написано')
+def response_to_user(message):
+    chat_id = message.chat.id
+
+    # Токен API к Dialogflow
+    request = apiai.ApiAI('Пользовательский токен с диалог флоу').text_request()
+
+    # На каком языке будет послан запрос
+    request.lang = 'ru'
+
+    # ID Сессии диалога чтобы потом учить бота
+    # Напишите любое название
+    request.session_id = 'Test'
+
+    # Посылаем запрос к серверу с сообщением от юзера
+    request.query = message.text
+
+    # Получаем ответ от сервера и декодируем в utf-8
+    response_json = json.loads(request.getresponse().read().decode('utf-8'))
+
+    # Достаём ответ ИИ
+    response_from_ai = response_json['result']['fulfillment']['speech']
+
+    bot.send_message(chat_id, response_from_ai)
 
 
 try:
