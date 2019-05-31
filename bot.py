@@ -1,6 +1,7 @@
 import json
 import loger
 import apiai
+import list_control
 import telebot as tb
 import proxy_changer
 from time import sleep
@@ -21,14 +22,13 @@ def response_to_user(message):
     chat_id = message.chat.id
 
     # Токен API к Dialogflow
-    request = apiai.ApiAI('Пользовательский токен с диалог флоу').text_request()
+    request = apiai.ApiAI('Пользовательский токен диалог флоу').text_request()
 
     # На каком языке будет послан запрос
     request.lang = 'ru'
 
     # ID Сессии диалога чтобы потом учить бота
-    # Напишите любое название
-    request.session_id = 'Test'
+    request.session_id = 'Любое значение'
 
     # Посылаем запрос к серверу с сообщением от юзера
     request.query = message.text
@@ -38,8 +38,47 @@ def response_to_user(message):
 
     # Достаём ответ ИИ
     response_from_ai = response_json['result']['fulfillment']['speech']
+    # Достаём текущее намерение
+    action = response_json['result']['action']
+    # Достаём список покупок от пользователя
+    parameters = response_json['result']['parameters']
 
-    bot.send_message(chat_id, response_from_ai)
+    if action == 'create_list.shop_list':
+        # Парсим список
+        shop_list = list_control.parse_list(parameters)
+        # Записываем его в файл
+        list_control.list_to_file(shop_list)
+        shop_list = list_control.list_from_file()
+        markup = list_control.create_buttons(shop_list)
+        # Отправляем его
+        bot.send_message(chat_id, 'Записал. Вот список', reply_markup=markup)
+
+    else:
+        bot.send_message(chat_id, response_from_ai)
+
+
+@bot.callback_query_handler(lambda query: True)
+def delete_button_from_list(query):
+    # Получаем список из файла
+    file_shop_list = list_control.list_from_file()
+    # Создаём список из кнопок
+    shop_list = list_control.create_buttons(file_shop_list)
+
+    # Удаляем кнопку
+    for button in shop_list.keyboard:
+        if button[0]['callback_data'] == query.data:
+            index_for_remove = shop_list.keyboard.index(button)
+            del shop_list.keyboard[index_for_remove]
+            file_shop_list.remove(button[0]['text'])
+            list_control.list_to_file(file_shop_list)
+
+    # Если список пустой – удаляем сообщение с ним
+    if not shop_list.keyboard:
+        bot.delete_message(query.message.chat.id, query.message.message_id)
+    # Если не пустой, обновляем сообщение с ним
+    else:
+        bot.edit_message_reply_markup(query.message.chat.id, query.message.message_id,
+                                      reply_markup=shop_list)
 
 
 try:
