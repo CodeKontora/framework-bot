@@ -1,3 +1,1 @@
-# Framework bot
-
-Каркас для бота
+# test_ai_bot

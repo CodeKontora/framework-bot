@@ -17,18 +17,25 @@ tb.apihelper.proxy = {'https': 'https://{}'.format(ip_port)}
 bot = tb.TeleBot('Токен бота', threaded=False)
 
 
+@bot.message_handler(commands=['start'])
+def send_welcome(message):
+    about_me = '''Привет. Я помогу со списком покупок.
+Попроси меня сделать список или пойти в магазин'''
+    bot.send_message(message.chat.id, about_me)
+
+
 @bot.message_handler(content_types=['text'])
 def response_to_user(message):
     chat_id = message.chat.id
 
     # Токен API к Dialogflow
-    request = apiai.ApiAI('Пользовательский токен диалог флоу').text_request()
+    request = apiai.ApiAI('Пользовательский токен с ДФ').text_request()
 
     # На каком языке будет послан запрос
     request.lang = 'ru'
 
     # ID Сессии диалога чтобы потом учить бота
-    request.session_id = 'Любое значение'
+    request.session_id = 'Любое текстовое значение'
 
     # Посылаем запрос к серверу с сообщением от юзера
     request.query = message.text
@@ -43,6 +50,7 @@ def response_to_user(message):
     # Достаём список покупок от пользователя
     parameters = response_json['result']['parameters']
 
+    # Создаем список покупок
     if action == 'create_list.shop_list':
         # Парсим список
         shop_list = list_control.parse_list(parameters)
@@ -53,6 +61,26 @@ def response_to_user(message):
         # Отправляем его
         bot.send_message(chat_id, 'Записал. Вот список', reply_markup=markup)
 
+    # Создаем напоминание
+    elif action == 'create_list.shop_list.notify':
+        # Если бот не смог распарсить время
+        if not parameters['time']:
+            bot.send_message(chat_id, 'Не могу прочитать время')
+
+        # Если напоминание поставлено без даты
+        if not parameters['date']:
+            bot.send_message(chat_id, 'Напомню в {}'.format(parameters['time']))
+            time_delta = list_control.get_time_delta(parameters['time'])
+            list_control.set_notify(time_delta, bot, chat_id)
+
+        # Если напоминание поставлено с датой и временем
+        else:
+            bot.send_message(chat_id, 'Напомню {} в {}'.format(parameters['date'],
+                                                               parameters['time']))
+            time_delta = list_control.get_time_delta(parameters['time'], parameters['date'])
+            list_control.set_notify(time_delta, bot, chat_id)
+
+    # Ответ бота на любые другие вопросы
     else:
         bot.send_message(chat_id, response_from_ai)
 
